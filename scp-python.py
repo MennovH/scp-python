@@ -1,5 +1,4 @@
 #! /usr/bin/env python3
-from __future__ import print_function # Only Python 2.x
 import socket,subprocess,platform,sys,os,getopt
 from colorama import Fore,Back,Style
 from getpass import getpass
@@ -23,14 +22,15 @@ except ValueError as e:
 def ipaddr(ip):
     try:
         if '.' in str(ip) or ':' in str(ip):
-            if ip is IPv4Address or ip is IPv6Address:
-                print(f'{Fore.CYAN}IP address set to:{Style.RESET_ALL} {setting[1]}')
-                return
+            socket.inet_aton(ip)
+            print(f'{Fore.CYAN}IP address set to:{Style.RESET_ALL} {ip}')
+            return
         elif 0 < int(ip) < 1000:
             ip = f'{subnet}.{ip}'
             print(f'{Fore.CYAN}IP address set:{Style.RESET_ALL} {ip}')
             return ip
-    except:
+    except ValueError as e:
+        print(e)
         print(f'{Fore.RED}IP-address \"{ip}\" has been declined{Style.RESET_ALL}')
     ip = ''
     return ip
