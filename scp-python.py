@@ -30,10 +30,8 @@ def ipaddr(ip):
             print(f'{Fore.CYAN}IP address set:{Style.RESET_ALL} {ip}')
             return ip
     except ValueError as e:
-        print(e)
         print(f'{Fore.RED}IP-address \"{ip}\" has been declined{Style.RESET_ALL}')
-    ip = ''
-    return ip
+    return ''
 
 def usage(err):
     if err is not None and err != 0:
