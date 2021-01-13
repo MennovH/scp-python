@@ -41,20 +41,6 @@ def ipaddr(ip):
         print(f'{red}IP-address \"{ip}\" has been declined{reset}')
     return ''
 
-def trial(setting):
-    print(f'\n{red}Host {setting[1]} authentication could not be verified.\nTesting connection. When prompted for adding the host {setting[1]} to known_host, type \'yes\' and press \'Enter\' in order for this script to work. Only accept when the host is trusted.\nAfter accepting or declining the prompt, wait for the process to end. This process will be terminated in about 5 seconds after reading this message.{reset}\n')
-    command = f'ssh {setting[0]}@{setting[1]}'
-    outputs = subprocess.Popen(args=command,
-                               shell=True,
-                               stderr=subprocess.PIPE,
-                               stdout=subprocess.PIPE,
-                               universal_newlines=True)
-    try: out,err = outputs.communicate(timeout=10)
-    except:
-        outputs.kill()
-        outputs.kill()
-    return
-
 #show help
 def usage(err):
     if err is not None and err != 0:
