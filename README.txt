@@ -16,6 +16,9 @@ or
 When it's executable by itself:
     ./scp-python.py
 
+The process needs sshpass to connect the password to the scp process. If not already installed,
+this script will start the installation automatically.
+
 It's possible to add comments on the command line. Sometimes even recommended:
     -u: receiving hostname
     -i: ip address of receiving host
