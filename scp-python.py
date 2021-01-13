@@ -3,6 +3,11 @@ import socket,subprocess,platform,sys,os,getopt
 from colorama import Fore,Back,Style
 from getpass import getpass
 
+if platform.system() == 'Linux':
+    desktop = os.path.join(os.path.join(os.path.expanduser('~')), 'Desktop')
+else:
+    desktop = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
+
 red = Fore.RED
 cyan = Fore.CYAN
 green = Fore.GREEN
@@ -45,12 +50,15 @@ def ipaddr(ip):
 def usage(err):
     if err is not None and err != 0:
         print (err)
-    print (f'{reset}Usage: {cyan}{sys.argv[0]} [-h <help>] [-u <username>] [-i <ip-address>] [-w <timeout in seconds>] [<path(s)>]{reset}')
+    print (f'{reset}Usage: {cyan}{sys.argv[0]} [-h <help>] [-u <username>] [-i <ip-address>] [-d <download>] [-w <timeout in seconds>] [<path(s)>]{reset}')
 
 #send item(s)
-def scp(user,ip,item_list,wait_period):
+def scp(user,ip,item_list,wait_period,get):
     value = input_user = msg = item_type = input_err = password = ''
-    for x in [item for item in item_list if not os.path.isdir(item) and not os.path.isfile(item)]: del item_list[item_list.index(x)]
+    if get == '':
+        for x in [item for item in item_list if not os.path.isdir(item) and not os.path.isfile(item)]: del item_list[item_list.index(x)]
+        print(f'{cyan}Action set: {reset}Send {len(item_list)} item(s)')
+    else: print(f'{cyan}Action set: {reset}Download {len(item_list)} item(s)')
     b = c = i = input_user = retries = 0
     success = handled = []
     setting = [user.replace(' ',''),ip.replace(' ','')]
@@ -85,20 +93,21 @@ def scp(user,ip,item_list,wait_period):
                  if input_user == 'show list':
                      print('\n'.join(f'{str(item_list.index(f)+1)}) {str(f)}' for f in item_list))
                      continue
-                 if os.path.isdir(input_user): item_type = f'{yellow}folder{reset}'
-                 elif os.path.isfile(input_user): item_type = 'file'
-                 else:
+                 if os.path.isdir(input_user) and get == '': item_type = f'{yellow}folder{reset}'
+                 elif os.path.isfile(input_user) and get == '': item_type = 'file'
+                 elif get == '':
                      print(f'{red}Path "{input_user}" doesn\'t exit{reset}')
                      continue
                  item = input_user
                  if item in item_list:
                      print(f'{red}Path "{input_user}" was already in list{reset}')
-                 elif os.path.isdir(input_user) or os.path.isfile(input_user):
+                 elif os.path.isdir(input_user) or os.path.isfile(input_user) or get != '':
                      item_list.append(item)
                      if len(item_list) < c: i = '(type "show list" to see the status)'
                      else: i = ''
                      print(f'{green}{item_type}: {green}{item_list[-1]} was added to the list {i}{reset}')
                      b += 1
+
         except (KeyboardInterrupt, Exception) as e:
             if (type(e).__name__) == 'KeyboardInterrupt' or input_user == 'exit':
                 msg = 'User ended the process\n'
@@ -111,19 +120,25 @@ def scp(user,ip,item_list,wait_period):
             if retries == 0 and attempt > 0: break
             retries = 0
             for item in item_list:
-                item_type = f'{yellow}folder{reset}' if os.path.isdir(item) else 'file'
+                if get == '': item_type = f'{yellow}folder{reset}' if os.path.isdir(item) else 'file'
                 try:
                     if password == '': password = getpass(f'Enter password for {setting[0]}: ')
                     #check known_hosts
                     #if item == item_list[0]: command = f'ssh-keygen -l -F {setting[1]}'
-                    command = f'sshpass -p {password} scp -o StrictHostKeyChecking=yes -r {item} {setting[0]}@{setting[1]}:'
+                    if get == '':
+                        command = f'sshpass -p {password} scp -o StrictHostKeyChecking=yes -r {item} {setting[0]}@{setting[1]}:'
+                    else:
+                        command = f'sshpass -p {password} scp -o StrictHostKeyChecking=yes {setting[0]}@{setting[1]}:/{item} {desktop}'
                     out,err = subprocess.Popen(args=command,
                                                  shell=True,
                                                  stderr=subprocess.PIPE,
                                                  stdout=subprocess.PIPE,
                                                  universal_newlines=True).communicate(timeout=wait_period)
                     if err == '':
-                        print(f'{green}Sent to {setting[0]}\'s root folder:{reset} {item_type}: {item}')
+                        if get != '':
+                            print(f'{green}Downloaded to {desktop}{reset}: {item}')
+                        else:
+                            print(f'{green}Sent to {setting[0]}\'s root folder:{reset} {item_type}: {item}')
                         handled.append(item)
                     elif err:
                         if 'Permission denied' in err and attempt < 2:
@@ -137,7 +152,10 @@ def scp(user,ip,item_list,wait_period):
                                 msg += f'{cyan}Try "ssh {setting[0]}@{setting[1]}" on the command line first, and type "yes" to accept {setting[1]} to be added to known_hosts{reset}\n'
                             break
                         else:
-                            print(f'{red}Failed to send:{reset} {item_type}: {item}\n{err.strip()}')
+                            if get != '':
+                                print(f'{red}Failed to download:{reset} {item_type}: {item}\n{err.strip()}')
+                            else:
+                                print(f'{red}Failed to send:{reset} {item_type}: {item}\n{err.strip()}')
                             handled.append(item)
                         continue
                 except (KeyboardInterrupt, Exception,ValueError) as e:
@@ -149,39 +167,60 @@ def scp(user,ip,item_list,wait_period):
                         if 'Timeout' in repr(e):
                             e = f'{red}Timeout of {wait_period} seconds exceeded...{reset}'
                         elif 'Timeout' not in repr(e):
-                            print(f'{red}Failed to send:{reset} {item_type}: {item}:',e)
+                            if get != '':
+                                print(f'{red}Failed to download:{reset} {item_type}: {item}:',e)
+                            else:
+                                print(f'{red}Failed to send:{reset} {item_type}: {item}:',e)
                         continue
     #report
+    if get != '': action = 'download'
+    else: action = 'send'
     if len(handled) != len(item_list):
-        print('Failed to send:')
+        print(f'Failed to {action}:')
         for x in [item for item in item_list if item not in handled]:
-            if os.path.isdir(x): item_type = f'{yellow}folder'
+            if get != '': item_type = 'item'
+            elif os.path.isdir(x): item_type = f'{yellow}folder'
             else: item_type = 'file'
-            print(f'{item_type}: {red}{x}')
+            print(f'{item_type}: {red}{x}{reset}')
     s = len(handled)
     t = len(item_list)
     f = t - s
-    if s == t and s != 0: msg += f'{green}Sent: {s}/{t}{reset}'
-    if s != t and s > 0: msg += f'{yellow}Sent: {s}/{t}{reset}'
-    if f == t or s == 0: msg += f'{red}Sent: {s}/{t}{reset}'
+    if get != '': msg += f'{yellow}(Possibly) downloaded: {s}/{t}{reset}'
+    else:
+        if s == t and s != 0: msg += f'{green}Sent: {s}/{t}{reset}'
+        if s != t and s > 0: msg += f'{yellow}Sent: {s}/{t}{reset}'
+        if f == t or s == 0: msg += f'{red}Sent: {s}/{t}{reset}'
     print(msg)
 
 #start process
 if __name__ == '__main__':
-    user = ip = ''
+    user = ip = get = ''
     wait_period = 30
+    listremove = []
     try:
-        (opts, args) = getopt.getopt(sys.argv[1:], 'hu:i:w:', ['user','ip','w'])
+        listed = sys.argv[1:]
+        if '-g' in listed:
+            get = listed.index('-g')
+            for i in range(len(listed)):
+                if i > get:
+                    if len(listed[i]) == 1:
+                        listremove.append(i)
+                    elif listed[i][0] == '-' and (listed[i][1] != 'i' or listed[i][1] != 'w'):
+                        listremove.append(i)
+            for x in [item for item in listed if len(item) == 1 or (len(item) > 2 and item[0] == '-' and (item[1] != 'w' or item[1] != 'i'))]: del listed[listed.index(x)]
+            del listed[get]
+        (opts, args) = getopt.getopt(listed, 'hu:i:w:', ['user','ip','w'])
         for opt, arg in opts:
             if opt in ('-h', '--help'): sys.exit(usage('Error occurred: {red}{err}'))
             elif opt in ('-u', '--user'): user = arg
             elif opt in ('-i', '--ip') and '.' in arg: ip = arg
             elif opt in ('-i', '--ip'): ip = int(arg)
             elif opt in ('-w', '--wait'): wait_period = int(arg)
+        if user != '': print(f'{cyan}Username set: {reset}{user}')
         if ip != '': ip = ipaddr(ip)
         items = '$'.join(args)
         if '$' in items: items = items.split('$')
         else: items = [items]
     except (getopt.GetoptError,Exception) as err:
         sys.exit(usage(f'Error occurred: {red}{err}'))
-    scp(user,ip,items,wait_period)
+    scp(user,ip,items,wait_period,get)

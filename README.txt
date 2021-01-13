@@ -2,7 +2,7 @@ scp-python.py
 
 This python script can only be used on Linux (tested on Kali and Ubuntu).
 
-This script can be used to easily send files and/or folders at once, 
+This script can be used to easily send or download files and/or folders at once,
 without having to enter a password per item.
 
 This script doesn't add hosts to the known_hosts file. The hosts must be known already in order
@@ -20,6 +20,7 @@ It's possible to add comments on the command line. Sometimes even recommended:
     -u: receiving hostname
     -i: ip address of receiving host
     -w: change timeout period in seconds (standard=30) for larger files and/or folders
+    -g: get/download. This option does not require an argument
 
 Recommendation:
     Add the paths of the files and/or folders when executing the script. Otherwise, you need to
