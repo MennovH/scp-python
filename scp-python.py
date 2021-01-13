@@ -99,7 +99,6 @@ def scp(user,ip,item_list,wait_period):
                      else: i = ''
                      print(f'{green}{item_type}: {green}{item_list[-1]} was added to the list {i}{reset}')
                      b += 1
-
         except (KeyboardInterrupt, Exception) as e:
             if (type(e).__name__) == 'KeyboardInterrupt' or input_user == 'exit':
                 msg = 'User ended the process\n'
