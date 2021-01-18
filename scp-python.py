@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
-import socket,subprocess,platform,sys,os,getopt,re
-from colorama import Fore,Back,Style
+import socket, subprocess, platform, sys, os, getopt, re
+from colorama import Fore, Back, Style
 from getpass import getpass
 
 if platform.system() == 'Linux':
@@ -14,25 +14,36 @@ green = Fore.GREEN
 yellow = Fore.YELLOW
 reset = Style.RESET_ALL
 
-#get own subnet for easy input
-def get_ip():
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.connect(("8.8.8.8", 80))
-    return s.getsockname()[0].rsplit(".", 1)[0]
-subnet = get_ip()
 
-#check if sshpass is installed
+# get own subnet for easy input
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+s.connect(("8.8.8.8", 80))
+subnet = s.getsockname()[0].rsplit(".", 1)[0]
+
+
+print(f'{yellow}NOTE: This program uses sshpass option -p to pass the password to scp. This is not considered safe.\nOnly use in your own environments.')
+
+
+# check if sshpass is installed
 package = 'sshpass'
 try:
     command = f'which {package}'
     check = subprocess.getoutput(command)
     if not check:
-        print (f'{red}sshpass not installed\n{green}installing...{reset}')
-        subprocess.run(["sudo", "apt", "install", "-y", package], check=True)
+        while 1:
+            user_input = input(f'{red}sshpass is not installed.{reset} Install? y/n: {reset}') or 'n'
+            if user_input == 'y' or user_input == 'n':
+                break
+        if user_input == 'y':
+            print(f'{green}Installing,...{reset}')
+            subprocess.run(["sudo", "apt", "install", "-y", package], check=True)
+        else:
+            sys.exit(f'{red}Not installed, program stopped...{reset}')
 except ValueError as e:
-    print (f'{red}{Back.WHITE}{package} could not be installed...{reset}')
+    print(f'{red}{Back.WHITE}{package} could not be installed...{reset}')
 
-#check if ip is valid
+
+# check if ip is valid
 def ipaddr(ip):
     try:
         if '.' in str(ip) or ':' in str(ip):
@@ -46,189 +57,207 @@ def ipaddr(ip):
         print(f'{red}IP-address \"{ip}\" has been declined{reset}')
     return ''
 
-#show help
+
+# show help
 def usage(err):
     if err is not None and err != 0:
-        print (err)
-    print (f'{reset}Usage: {cyan}{sys.argv[0]} [-h <help>] [-u <username>] [-i <ip-address>] [-d <download>] [-w <timeout in seconds>] [<path(s)>]{reset}')
+        print(err)
+    print(f'{reset}Usage: {cyan}{sys.argv[0]} [-h <help>] [-a <action (s) or (d)>] [-u <username>] [-i <ip-address>] [-d <download>] [-w <timeout in seconds>] [<path(s)>]{reset}')
 
-#send item(s)
-def scp(user,ip,item_list,wait_period,get):
-    value = input_user = msg = item_type = input_err = password = ''
-    if get == '':
-        action = 'Send'
-    else:
-        action = 'Download'
-    for x in [item for item in item_list if get == '' and (not os.path.isdir(item) and not os.path.isfile(item)) or item == '']:
+
+# send item(s)
+def scp(user, ip, item_list, timeout, action):
+    value = user_input = msg = item_type = input_err = password = ''
+    for x in [item for item in item_list if action == 'Send' and (not os.path.isdir(item) and not os.path.isfile(item)) or item == '']:
         del item_list[item_list.index(x)]
     print(f'{cyan}Action set: {reset}{action} {len(item_list)} item(s)')
-    b = c = i = input_user = retries = 0
+    b = c = i = user_input = retries = 0
     success = handled = []
-    setting = [user.replace(' ',''),ip.replace(' ','')]
+    setting = [action.replace(' ', ''), user.replace(' ', ''), ip.replace(' ', '')]
     try:
-        int(wait_period)
+        int(timeout)
     except:
-        wait_period = 30
-    if wait_period == 1:
-        print(f'{cyan}Timeout (wait) set:{reset} {w} second')
-    else:
-        print(f'{cyan}Timeout (wait) set:{reset} {wait_period} seconds')
+        timeout = 30
+    print(f'{cyan}Timeout set:{reset} {timeout} second') if timeout == 1 else print(f'{cyan}Timeout set:{reset} {timeout} seconds')
     while '' in setting:
         try:
-            if i > 1: i = 0
-            if i == 0: value = 'Username'
-            elif i == 1: value = f'IP (current subnet: {subnet}....)'
+            if i > 2:
+                i = 0
+            if i == 0:
+                value = 'Action'
+            elif i == 1:
+                value = 'Username'
+            elif i == 2:
+                value = f'IP (current subnet: {subnet}....)'
             if setting[i] == '':
                 if i == 0:
+                    user_input = input(f'send (s) or download (d)?: ').lower()
+                    if user_input == 's' or user_input == 'd':
+                        setting[i] = 'Send' if user_input == 's' else 'Download'
+                if i == 1:
                     setting[i] = input(f'Enter the {value.lower()} of the receiver: ')
-                else:
+                elif i == 2:
                     setting[i] = ipaddr(input(f'Enter the {value} of the receiver: '))
                 if setting[i] != '':
                     print(f'{cyan}{value} set:{reset} {setting[i]}')
             i += 1
         except (KeyboardInterrupt, Exception) as e:
-            if (type(e).__name__) == 'KeyboardInterrupt' or input_user == 'exit':
+            if type(e).__name__ == 'KeyboardInterrupt' or user_input == 'exit':
                 msg = 'User ended the process\n'
                 break
     while len(item_list) == 0 and '' not in setting:
         try:
             if len(item_list) == 0 and c == 0:
-                input_user = input(f'{input_err}Enter the number of items: {reset}')
-            if input_user == 'exit':
+                user_input = input(f'{input_err}Enter the number of items: {reset}')
+            if user_input == 'exit':
                 msg = 'User ended the process\n'
                 break
-            c = int(input_user) if int(input_user) > 0 else 0
+            c = int(user_input) if int(user_input) > 0 else 0
             while len(item_list) < c:
-                 input_user = input(f'Enter absolute path of item {b + 1}: ')
-                 if input_user == 'exit':
-                     break
-                 if input_user == 'show list':
-                     print('\n'.join(f'{str(item_list.index(f)+1)}) {str(f)}' for f in item_list))
-                     continue
-                 if len(re.sub(r'[ ’‘\'"`]', '', input_user)) < len(input_user):
-                     print(f'->{red} path may not be empty or contain ’‘\'"`{reset}')
-                     continue
-                 if get == '':
-                     if os.path.isdir(input_user):
-                         item_type = f'{yellow}folder{reset}'
-                     elif os.path.isfile(input_user):
-                         item_type = 'file'
-                     else:
-                         print(f'->{red} Path "{input_user}" doesn\'t exit{reset}')
-                         continue
-                 else:
-                     item_type = 'item'
-                 item = input_user
-                 if item in item_list:
-                     print(f'->{red} Path "{input_user}" was already listed{reset}')
-                 elif os.path.isdir(input_user) or os.path.isfile(input_user) or get != '':
-                     item_list.append(item)
-                     if len(item_list) < c: i = '(type "show list" to see the status)'
-                     else: i = ''
-                     print(f'->{green} added to list: {item_list[-1]} ({item_type}) {i}{reset}')
-                     b += 1
+                user_input = input(f'Enter absolute path of item {b + 1}: ')
+                if user_input == 'exit':
+                    break
+                if user_input == 'show list':
+                    print('\n'.join(f'{str(item_list.index(f) + 1)}) {str(f)}' for f in item_list))
+                    continue
+                if len(re.sub(r'[ ’‘\'"`]', '', user_input)) < len(user_input):
+                    print(f'->{red} path may not be empty or contain ’‘\'"`{reset}')
+                    continue
+                if action == '':
+                    if os.path.isdir(user_input):
+                        item_type = f'{yellow}folder{reset}'
+                    elif os.path.isfile(user_input):
+                        item_type = 'file'
+                    else:
+                        print(f'->{red} Path "{user_input}" doesn\'t exit{reset}')
+                        continue
+                else:
+                    item_type = 'item'
+                item = user_input
+                if item in item_list:
+                    print(f'->{red} Path "{user_input}" was already listed{reset}')
+                elif os.path.isdir(user_input) or os.path.isfile(user_input) or action == 'Download':
+                    item_list.append(item)
+                    if len(item_list) < c:
+                        i = '(type "show list" to see the status)'
+                    else:
+                        i = ''
+                    print(f'->{green} added to list: {item_list[-1]} ({item_type}) {i}{reset}')
+                    b += 1
         except (KeyboardInterrupt, Exception) as e:
-            if (type(e).__name__) == 'KeyboardInterrupt' or input_user == 'exit':
+            if type(e).__name__ == 'KeyboardInterrupt' or user_input == 'exit':
                 msg = 'User ended the process\n'
                 break
-            input_err = f'->{red} Invalid literal for int() with base 10: {input_user}\n   Enter \'exit\' to stop or try again.\n{reset}'
-            input_user = 0
+            input_err = f'->{red} Invalid literal for int() with base 10: {user_input}\nEnter \'exit\' to stop or try again.\n{reset}'
+            user_input = 0
             pass
     if len(item_list) > 0 and msg == '':
         for attempt in range(3):
-            if retries == 0 and attempt > 0: break
+            if retries == 0 and attempt > 0:
+                break
             retries = 0
             for item in item_list:
-                if get == '': item_type = f'{yellow}folder{reset}' if os.path.isdir(item) else 'file'
+                if action == 'Send':
+                    item_type = f'{yellow}folder{reset}' if os.path.isdir(item) else 'file'
                 try:
-                    if password == '': password = getpass(f'Enter password for {setting[0]}: ')
-                    if get == '': cmd = f'sshpass -p {password} scp -o StrictHostKeyChecking=yes -r {item} {setting[0]}@{setting[1]}:'
-                    else: cmd = f'sshpass -p {password} scp -o StrictHostKeyChecking=yes {setting[0]}@{setting[1]}:/{item} {desktop}'
-                    out,err = subprocess.Popen(args=cmd,
-                                                 shell=True,
-                                                 stderr=subprocess.PIPE,
-                                                 stdout=subprocess.PIPE,
-                                                 universal_newlines=True).communicate(timeout=wait_period)
+                    if password == '':
+                        password = getpass(f'Enter password for {setting[1]}: ')
+                    cmd = f'sshpass -p {password} scp -o StrictHostKeyChecking=yes -r {item} {setting[1]}@{setting[2]}:' if action == 'Send' else f'sshpass -p {password} scp -o StrictHostKeyChecking=yes -r {setting[1]}@{setting[2]}:/{item} {desktop}'
+                    out, err = subprocess.Popen(args=cmd,
+                                                shell=True,
+                                                stderr=subprocess.PIPE,
+                                                stdout=subprocess.PIPE,
+                                                universal_newlines=True).communicate(timeout=timeout)
                     if err == '':
-                        if get != '': print(f'{yellow}(Possibly) downloaded to {desktop}{reset}: {item}')
-                        else: print(f'{green}Sent to {setting[0]}\'s root folder:{reset} {item_type}: {item}')
+                        print(f'{yellow}(Possibly) downloaded to {desktop}{reset}: {item}') if action == 'Download' else print(f'{green}Sent to {setting[0]}\'s root folder:{reset} {item_type}: {item}')
                         handled.append(item)
-                    elif err:
+                    else:
                         if 'Permission denied' in err and attempt < 2:
                             retries = 1
-                            password = getpass(f'Permission denied. Enter password for {setting[0]}: ')
+                            password = getpass(f'Permission denied. Enter password for {setting[1]}: ')
                             err = ''
                             break
                         if 'Could not resolve hostname' in err or 'Host key verification failed.' in err or 'No route to host' in err:
                             msg = out if err == '' else err
                             if 'Could not resolve hostname' in err or 'Host key verification failed.' in err:
-                                msg += f'{cyan}Try "ssh {setting[0]}@{setting[1]}" on the command line first, and type "yes" to accept {setting[1]} to be added to known_hosts{reset}\n'
+                                msg += f'{cyan}Try "ssh {setting[1]}@{setting[2]}" on the command line first, and type "yes" to accept {setting[2]} to be added to known_hosts{reset}\n'
                             break
                         else:
-                            if get != '': print(f'{red}Failed to download:{reset} {item_type}: {item}\n{err.strip()}')
-                            else: print(f'{red}Failed to send:{reset} {item_type}: {item}\n{err.strip()}')
+                            if action == 'Download':
+                                print(f'{red}Failed to download:{reset} {item_type}: {item}\n{err.strip()}')
+                            else:
+                                print(f'{red}Failed to send:{reset} {item_type}: {item}\n{err.strip()}')
                             handled.append(item)
                         continue
-                except (KeyboardInterrupt, Exception,ValueError) as e:
-                    if (type(e).__name__) == 'KeyboardInterrupt':
+                except (KeyboardInterrupt, Exception, ValueError) as e:
+                    if type(e).__name__ == 'KeyboardInterrupt':
                         msg = 'User ended the process\n'
                         break
                     else:
-                        e = repr(e).replace(password,'**********')
+                        e = repr(e).replace(password, '**********')
                         if 'Timeout' in repr(e):
-                            e = f'{red}Timeout of {wait_period} seconds exceeded...{reset}'
+                            e = f'{red}Timeout of {timeout} seconds exceeded...{reset}'
                         elif 'Timeout' not in repr(e):
-                            if get != '':
-                                print(f'{red}Failed to download:{reset} {item_type}: {item}:',e)
+                            if action == 'Download':
+                                print(f'{red}Failed to download:{reset} {item_type}: {item}:', e)
                             else:
-                                print(f'{red}Failed to send:{reset} {item_type}: {item}:',e)
+                                print(f'{red}Failed to send:{reset} {item_type}: {item}:', e)
                         continue
-    #report
+    # report
     if len(handled) != len(item_list):
         print(f'Failed to {action.lower()}:')
         for x in [item for item in item_list if item not in handled]:
-            if get != '': item_type = 'item'
-            elif os.path.isdir(x): item_type = f'{yellow}folder'
-            else: item_type = 'file'
+            if action == 'Download':
+                item_type = 'item'
+            elif os.path.isdir(x):
+                item_type = f'{yellow}folder'
+            else:
+                item_type = 'file'
             print(f'{item_type}: {red}{x}{reset}')
     s = len(handled)
     t = len(item_list)
-    if get != '': msg += f'{yellow}(Possibly) downloaded: {s}/{t}{reset}'
+    if action == 'Download':
+        msg += f'{yellow}(Possibly) downloaded: {s}/{t}{reset}'
     else:
-        if s == t and s != 0: msg += f'{green}Sent: {s}/{t}{reset}'
-        if s != t and s > 0: msg += f'{yellow}Sent: {s}/{t}{reset}'
-        if (t-s) == t or s == 0: msg += f'{red}Sent: {s}/{t}{reset}'
+        if s == t and s != 0:
+            msg += f'{green}Sent: {s}/{t}{reset}'
+        if s != t and s > 0:
+            msg += f'{yellow}Sent: {s}/{t}{reset}'
+        if (t - s) == t or s == 0:
+            msg += f'{red}Sent: {s}/{t}{reset}'
     print(msg)
 
-#start process
+
+# start process
 if __name__ == '__main__':
-    user = ip = get = ''
-    wait_period = 30
-    listremove = []
+    user = ip = action = ''
+    timeout = 30
     try:
-        listed = sys.argv[1:]
-        if '-g' in listed:
-            get = listed.index('-g')
-            for i in range(len(listed)):
-                if i > get:
-                    if len(listed[i]) == 1:
-                        listremove.append(i)
-                    elif listed[i][0] == '-' and (listed[i][1] != 'i' or listed[i][1] != 'w'):
-                        listremove.append(i)
-            for x in [item for item in listed if len(item) == 1 or (len(item) > 2 and item[0] == '-' and (item[1] != 'w' or item[1] != 'i'))]: del listed[listed.index(x)]
-            del listed[get]
-        (opts, args) = getopt.getopt(listed, 'hu:i:w:', ['user','ip','w'])
+        (opts, args) = getopt.getopt(sys.argv[1:], 'ha:u:i:w:', ['action', 'user', 'ip', 'timeout'])
         for opt, arg in opts:
-            if opt in ('-h', '--help'): sys.exit(usage('Error occurred: {red}{err}'))
-            elif opt in ('-u', '--user'): user = arg
-            elif opt in ('-i', '--ip') and '.' in arg: ip = arg
-            elif opt in ('-i', '--ip'): ip = int(arg)
-            elif opt in ('-w', '--wait'): wait_period = int(arg)
-        if user != '': print(f'{cyan}Username set: {reset}{user}')
-        if ip != '': ip = ipaddr(ip)
+            if opt in ('-h', '--help'):
+                sys.exit(usage('Error occurred: {red}{err}'))
+            elif opt in ('-a', '--action') and (arg == 's' or arg == 'd'):
+                action = 'Send' if arg == 's' else 'Download'
+            elif opt in ('-u', '--user'):
+                user = arg
+            elif opt in ('-i', '--ip') and '.' in arg:
+                ip = arg
+            elif opt in ('-i', '--ip'):
+                ip = int(arg)
+            elif opt in ('-t', '--timeout'):
+                timeout = int(arg)
+        if action != '':
+            print(f'{cyan}Action set: {reset}{action}]')
+        if user != '':
+            print(f'{cyan}Username set: {reset}{user}')
+        if ip != '':
+            ip = ipaddr(ip)
         items = '$'.join(args)
-        if '$' in items: items = items.split('$')
-        else: items = [items]
-    except (getopt.GetoptError,Exception) as err:
+        if '$' in items:
+            items = items.split('$')
+        else:
+            items = [items]
+    except (getopt.GetoptError, Exception) as err:
         sys.exit(usage(f'Error occurred: {red}{err}'))
-    scp(user,ip,items,wait_period,get)
+    scp(user, ip, items, timeout, action)
