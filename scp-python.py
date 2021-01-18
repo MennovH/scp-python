@@ -48,10 +48,8 @@ def ipaddr(ip):
     try:
         if '.' in str(ip) or ':' in str(ip):
             socket.inet_aton(ip)
-            print(f'{cyan}IP address set to:{reset} {ip}')
         elif 0 < int(ip) < 1000:
             ip = f'{subnet}.{ip}'
-            print(f'{cyan}IP address set:{reset} {ip}')
             return ip
     except ValueError as e:
         print(f'{red}IP-address \"{ip}\" has been declined{reset}')
@@ -108,6 +106,8 @@ def scp(user, ip, item_list, timeout, action):
                 elif i == 2:
                     setting[i] = ipaddr(input(f'Enter the {value} of the receiver: '))
                 if setting[i] != '':
+                    if value == f'IP (current subnet: {subnet}....)':
+                        value = 'IP address'
                     print(f'{cyan}{value} set:{reset} {setting[i]}')
             i += 1
         except (KeyboardInterrupt, Exception) as e:
