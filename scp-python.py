@@ -248,7 +248,7 @@ if __name__ == '__main__':
             elif opt in ('-t', '--timeout'):
                 timeout = int(arg)
         if action != '':
-            print(f'{cyan}Action set: {reset}{action}]')
+            print(f'{cyan}Action set: {reset}{action}')
         if user != '':
             print(f'{cyan}Username set: {reset}{user}')
         if ip != '':
