@@ -74,7 +74,7 @@ def scp(user, ip, item_list, timeout, action):
         print(f'{cyan}Action set: {reset}{action} {len(item_list)} item(s):')
         for item in item_list:
             if action == 's':
-                if os.isdir(item):
+                if os.path.isdir(item):
                     print(f'{item} {yellow}(folder){reset}')
                 else:
                     print(f'{item} (file)')
