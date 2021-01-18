@@ -70,7 +70,16 @@ def scp(user, ip, item_list, timeout, action):
     value = user_input = msg = item_type = input_err = password = ''
     for x in [item for item in item_list if action == 'Send' and (not os.path.isdir(item) and not os.path.isfile(item)) or item == '']:
         del item_list[item_list.index(x)]
-    print(f'{cyan}Action set: {reset}{action} {len(item_list)} item(s)')
+    if action != '':
+        print(f'{cyan}Action set: {reset}{action} {len(item_list)} item(s):')
+        for item in item_list:
+            if action == 's':
+                if os.path.isdir(item):
+                    print(f'{item} {yellow}(folder){reset}')
+                else:
+                    print(f'{item} (file)')
+            else:
+                print(f'{item} (item)')
     b = c = i = user_input = retries = 0
     success = handled = []
     setting = [action.replace(' ', ''), user.replace(' ', ''), ip.replace(' ', '')]
@@ -93,7 +102,7 @@ def scp(user, ip, item_list, timeout, action):
                 if i == 0:
                     user_input = input(f'send (s) or download (d)?: ').lower()
                     if user_input == 's' or user_input == 'd':
-                        setting[i] = 'Send' if user_input == 's' else 'Download'
+                        action = setting[i] = 'Send' if user_input == 's' else 'Download'
                 if i == 1:
                     setting[i] = input(f'Enter the {value.lower()} of the receiver: ')
                 elif i == 2:
@@ -105,6 +114,8 @@ def scp(user, ip, item_list, timeout, action):
             if type(e).__name__ == 'KeyboardInterrupt' or user_input == 'exit':
                 msg = 'User ended the process\n'
                 break
+    if len(item_list) == 0:
+        item_list_len = 0
     while len(item_list) == 0 and '' not in setting:
         try:
             if len(item_list) == 0 and c == 0:
@@ -123,7 +134,7 @@ def scp(user, ip, item_list, timeout, action):
                 if len(re.sub(r'[ ’‘\'"`]', '', user_input)) < len(user_input):
                     print(f'->{red} path may not be empty or contain ’‘\'"`{reset}')
                     continue
-                if action == '':
+                if action == 'Send':
                     if os.path.isdir(user_input):
                         item_type = f'{yellow}folder{reset}'
                     elif os.path.isfile(user_input):
@@ -142,7 +153,7 @@ def scp(user, ip, item_list, timeout, action):
                         i = '(type "show list" to see the status)'
                     else:
                         i = ''
-                    print(f'->{green} added to list: {item_list[-1]} ({item_type}) {i}{reset}')
+                    print(f'->{green} added to list: {item_list[-1]} {reset}({item_type}) {i}{reset}')
                     b += 1
         except (KeyboardInterrupt, Exception) as e:
             if type(e).__name__ == 'KeyboardInterrupt' or user_input == 'exit':
@@ -151,6 +162,16 @@ def scp(user, ip, item_list, timeout, action):
             input_err = f'->{red} Invalid literal for int() with base 10: {user_input}\nEnter \'exit\' to stop or try again.\n{reset}'
             user_input = 0
             pass
+    if item_list_len == 0 and len(item_list) > 0:
+        print(f'{cyan}Action set: {reset}{action} {len(item_list)} item(s):')
+        for item in item_list:
+            if action == 'Send':
+                if os.path.isdir(item):
+                    print(f'{item} {yellow}(folder){reset}')
+                else:
+                    print(f'{item} (file)')
+            else:
+                print(f'{item} (item)')
     if len(item_list) > 0 and msg == '':
         for attempt in range(3):
             if retries == 0 and attempt > 0:
@@ -169,7 +190,7 @@ def scp(user, ip, item_list, timeout, action):
                                                 stdout=subprocess.PIPE,
                                                 universal_newlines=True).communicate(timeout=timeout)
                     if err == '':
-                        print(f'{yellow}(Possibly) downloaded to {desktop}{reset}: {item}') if action == 'Download' else print(f'{green}Sent to {setting[0]}\'s root folder:{reset} {item_type}: {item}')
+                        print(f'{yellow}(Possibly) downloaded to {desktop}{reset}: {item}') if action == 'Download' else print(f'{green}Sent to {setting[1]}\'s root folder:{reset} {item_type}: {item}')
                         handled.append(item)
                     else:
                         if 'Permission denied' in err and attempt < 2:
