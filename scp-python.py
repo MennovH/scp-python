@@ -74,7 +74,7 @@ def scp(user, ip, item_list, timeout, action):
         print(f'{cyan}Action set: {reset}{action} {len(item_list)} item(s):')
         for item in item_list:
             if action == 's':
-                if os.path.isdir(item):
+                if os.isdir(item):
                     print(f'{item} {yellow}(folder){reset}')
                 else:
                     print(f'{item} (file)')
@@ -114,8 +114,7 @@ def scp(user, ip, item_list, timeout, action):
             if type(e).__name__ == 'KeyboardInterrupt' or user_input == 'exit':
                 msg = 'User ended the process\n'
                 break
-    if len(item_list) == 0:
-        item_list_len = 0
+    item_list_len = 0 if len(item_list) == 0 else len(item_list)
     while len(item_list) == 0 and '' not in setting:
         try:
             if len(item_list) == 0 and c == 0:
